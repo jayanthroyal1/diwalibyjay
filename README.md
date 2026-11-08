@@ -46,3 +46,6 @@ MediaPipe's WASM runtime and hand landmark model are served from the same GitHub
 
 The site includes an Open Graph social image and WhatsApp/Teams-friendly metadata for its Diwali 2026 greeting card.
 
+
+Use the cache-busted share URL https://jayanthroyal1.github.io/diwalibyjay/?share=diwali2026-jayanthg when sending the updated card preview.
+
