@@ -40,3 +40,9 @@ The included Actions workflow builds and deploys every push to main. In the repo
 
 Use the Record button to capture the animated canvas and generated Web Audio together as a video file. Recording uses MediaRecorder when supported by the browser; the app synthesizes all effects and downloads no sound files.
 
+
+MediaPipe's WASM runtime and hand landmark model are served from the same GitHub Pages site to avoid third-party asset-host failures.
+
+
+The site includes an Open Graph social image and WhatsApp/Teams-friendly metadata for its Diwali 2026 greeting card.
+

@@ -3,3 +3,5 @@
 #app.camera-on #camera{opacity:.23}
 #stage{z-index:-1}
 @media(max-width:650px){#app.camera-on #camera{opacity:.2}}
+
+#app.camera-on #camera{opacity:.78;filter:brightness(.86) saturate(1.18)}#app.camera-on .vignette{background:linear-gradient(115deg,rgba(16,11,24,.42),rgba(16,11,24,.14)),linear-gradient(0deg,rgba(16,11,24,.56),transparent 48%);backdrop-filter:blur(2px) saturate(1.12)}#app.camera-on::after{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(135deg,rgba(255,234,213,.055),transparent 42%,rgba(219,168,255,.035));backdrop-filter:blur(1px)}#app.camera-on .intro,#app.camera-on .topbar,#app.camera-on .live-status,#app.camera-on .gesture-hint,#app.camera-on .celebration-name,#app.camera-on .footer,#app.camera-on .replay,#app.camera-on .toast{z-index:2}@media(max-width:650px){#app.camera-on #camera{opacity:.78}}

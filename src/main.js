@@ -210,8 +210,10 @@ async function startCamera() {
     return;
   }
   try {
-    const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm');
-    const trackerOptions = { baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', delegate: 'GPU' }, runningMode: 'VIDEO', numHands: 2, minHandDetectionConfidence: .55, minHandPresenceConfidence: .5, minTrackingConfidence: .5 };
+    const assetBase = import.meta.env.BASE_URL;
+    const vision = await FilesetResolver.forVisionTasks(`${assetBase}wasm`);
+    const modelUrl = new URL(`${assetBase}models/hand_landmarker.task`, window.location.href).href;
+    const trackerOptions = { baseOptions: { modelAssetPath: modelUrl, delegate: 'GPU' }, runningMode: 'VIDEO', numHands: 2, minHandDetectionConfidence: .55, minHandPresenceConfidence: .5, minTrackingConfidence: .5 };
     try { landmarker = await HandLandmarker.createFromOptions(vision, trackerOptions); }
     catch { trackerOptions.baseOptions.delegate = 'CPU'; landmarker = await HandLandmarker.createFromOptions(vision, trackerOptions); }
     running = true; $('statusText').textContent = 'Show me a gesture'; detectionLoop(performance.now());
