@@ -24,7 +24,7 @@ Open the printed local URL. Camera access works on localhost and secure HTTPS pa
 
 Hand landmarks are processed locally with MediaPipe Tasks Vision. Video inference is throttled independently from the canvas animation to keep the visual effects responsive. The front-facing camera is preferred when available.
 
-The effects use separate generators for each gesture, a preallocated 3,500-particle pool, additive trails, and procedural Web Audio, including sustained fountain and sparkler sounds. The front-camera video is shown once as a translucent, mirrored layer; a separate transparent canvas draws the fireworks on top. This avoids copying every camera frame through JavaScript and removes the duplicate camera layer some mobile browsers showed.
+The effects use separate generators for each gesture and a preallocated 3,500-particle pool. Firework sounds use the local samples from the reference project, loaded into Web Audio, with sustained fountain and sparkler loops. The front-camera video is shown once as a translucent, mirrored layer; a separate transparent canvas draws the fireworks on top. This avoids copying every camera frame through JavaScript and removes the duplicate camera layer some mobile browsers showed.
 
 ## Build
 
@@ -44,7 +44,7 @@ MediaPipe's WASM runtime and hand landmark model are served from the same GitHub
 The site includes an Open Graph social image and WhatsApp/Teams-friendly metadata for its Diwali 2026 greeting card.
 
 
-Use the cache-busted share URL https://jayanthroyal1.github.io/diwalibyjay/?share=diwali2026-jayanthg when sending the updated card preview.
+Use the cache-busted share URL https://jayanthroyal1.github.io/diwalibyjay/?share=diwali2026-jayanthg-v3 when sending the updated card preview.
 
 
 ## Controls

@@ -20,6 +20,10 @@ export class FireworkDirector {
     this.onSound = onSound;
   }
 
+  public get hasActiveEffects(): boolean {
+    return this.effects.length > 0 || this.pool.activeCount > 0 || this.pool.flashes.length > 0;
+  }
+
   public setSoundCallback(cb: SoundTriggerCallback): void {
     this.onSound = cb;
   }

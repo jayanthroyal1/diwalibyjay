@@ -3,6 +3,7 @@ import './mobile.css';
 import './camera-fix.css';
 import { VisionEngine } from './vision/visionEngine.ts';
 import { FireworkDirector } from './fireworks/fireworkDirector.ts';
+import { PyroAudioEngine } from './audio/pyroAudioEngine.ts';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('stage');
@@ -10,12 +11,10 @@ const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
 const video = $('camera');
 const app = $('app');
 const ui = { intro: $('intro'), permission: $('permission'), live: $('liveStatus'), status: $('statusText'), hint: $('gestureHint'), name: $('celebrationName'), toast: $('toast') };
-const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 let width = 0, height = 0, dpr = 1, lastFrame = 0, cameraStream, running = false;
-let audio, audioBus, noiseBuffer, soundOn = true, vision, director, debugMode = false, creatorMode = false;
-const audioLoops = { fountain: null, sparkler: null };
-let videoFrameId = 0, fallbackDetectionTimer = 0, lastDetection = 0, finaleTimer = 0, toastTimer = 0, lastStatusGesture = '';
-const soundTimes = Object.create(null);
+let soundOn = true, audioEngine, vision, director, debugMode = false, creatorMode = false;
+let videoFrameId = 0, renderFrameId = 0, fallbackDetectionTimer = 0, lastDetection = 0, finaleTimer = 0, toastTimer = 0, lastStatusGesture = '';
+let effectsPainted = false;
 const soundLabels = { ROCKET: 'Rocket', ANAR: 'Anar fountain', STARBURST: 'Starburst', ROMAN_CANDLE: 'Roman candle', PHOOLJHADI: 'Sparkler', GRAND_FINALE: 'Grand finale' };
 
 function resize() {
@@ -32,152 +31,47 @@ window.addEventListener('resize', resize, { passive: true });
 window.visualViewport?.addEventListener('resize', resize, { passive: true });
 resize();
 
-function ensureAudio() {
-  audio ||= new (window.AudioContext || window.webkitAudioContext)();
-  if (!audioBus) {
-    audioBus = audio.createGain();
-    audioBus.gain.value = soundOn ? 1 : 0;
-    audioBus.connect(audio.destination);
-  }
-  if (audio.state === 'suspended') audio.resume().catch(() => {});
-  return audio;
-}
-
-function makeNoiseBuffer() {
-  const buffer = audio.createBuffer(1, audio.sampleRate, audio.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-  return buffer;
-}
-
-function startNoiseLoop(kind) {
-  if (!soundOn || audioLoops[kind]) return;
-  try {
-    ensureAudio();
-    noiseBuffer ||= makeNoiseBuffer();
-    const source = audio.createBufferSource();
-    const filter = audio.createBiquadFilter();
-    const gain = audio.createGain();
-    let lfo = null;
-    source.buffer = noiseBuffer;
-    source.loop = true;
-    filter.type = 'bandpass';
-    filter.frequency.value = kind === 'fountain' ? 1650 : 4300;
-    filter.Q.value = kind === 'fountain' ? .65 : 1.8;
-    gain.gain.value = .001;
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(audioBus);
-    if (kind === 'sparkler') {
-      lfo = audio.createOscillator();
-      const depth = audio.createGain();
-      lfo.type = 'sine';
-      lfo.frequency.value = 5.5;
-      depth.gain.value = 650;
-      lfo.connect(depth);
-      depth.connect(filter.frequency);
-      lfo.start();
-    }
-    source.start();
-    gain.gain.setTargetAtTime(kind === 'fountain' ? .035 : .028, audio.currentTime, .08);
-    audioLoops[kind] = { source, gain, lfo };
-  } catch { /* Keep gesture effects available when a browser declines audio playback. */ }
-}
-
-function stopNoiseLoop(kind) {
-  const loop = audioLoops[kind];
-  if (!loop || !audio) return;
-  loop.gain.gain.setTargetAtTime(.001, audio.currentTime, .04);
-  try { loop.source.stop(audio.currentTime + .22); } catch {}
-  try { loop.lfo?.stop(audio.currentTime + .22); } catch {}
-  audioLoops[kind] = null;
-}
-
-function sound(type, frequency = 500, intensity = 1) {
-  if (!soundOn) return;
-  const nowMs = performance.now();
-  const minGap = type === 'fountain' ? 140 : type === 'crackle' ? 85 : 0;
-  if (minGap && nowMs - (soundTimes[type] || 0) < minGap) return;
-  soundTimes[type] = nowMs;
-  try {
-    ensureAudio();
-    const now = audio.currentTime;
-    const variation = .92 + Math.random() * .16;
-    const duration = (.28 + Math.random() * .12) * variation;
-    const gain = audio.createGain();
-    gain.connect(audioBus);
-    if (type === 'fountain' || type === 'crackle') {
-      noiseBuffer ||= makeNoiseBuffer();
-      const source = audio.createBufferSource();
-      const filter = audio.createBiquadFilter();
-      source.buffer = noiseBuffer;
-      filter.type = 'bandpass';
-      filter.frequency.value = (type === 'fountain' ? 1800 : 4200) * variation;
-      filter.Q.value = type === 'fountain' ? .65 : 1.8;
-      source.connect(filter);
-      filter.connect(gain);
-      gain.gain.setValueAtTime((type === 'fountain' ? .027 : .045) * intensity, now);
-      gain.gain.exponentialRampToValueAtTime(.001, now + duration);
-      source.start(now);
-      source.stop(now + duration);
-      return;
-    }
-    if (type === 'boom' || type === 'pop') {
-      noiseBuffer ||= makeNoiseBuffer();
-      const transient = audio.createBufferSource();
-      const transientFilter = audio.createBiquadFilter();
-      const transientGain = audio.createGain();
-      transient.buffer = noiseBuffer;
-      transientFilter.type = type === 'pop' ? 'highpass' : 'lowpass';
-      transientFilter.frequency.value = type === 'pop' ? 5200 : 720;
-      transientGain.gain.setValueAtTime((type === 'pop' ? .065 : .095) * intensity, now);
-      transientGain.gain.exponentialRampToValueAtTime(.001, now + (type === 'pop' ? .055 : .14));
-      transient.connect(transientFilter);
-      transientFilter.connect(transientGain);
-      transientGain.connect(audioBus);
-      transient.start(now);
-      transient.stop(now + (type === 'pop' ? .06 : .15));
-    }
-    const osc = audio.createOscillator();
-    osc.connect(gain);
-    const base = type === 'rocket' ? 320 : frequency;
-    osc.type = type === 'rocket' ? 'triangle' : 'sine';
-    osc.frequency.setValueAtTime(base * variation, now);
-    if (type === 'rocket') osc.frequency.exponentialRampToValueAtTime(1550 * variation, now + .46 * variation);
-    else osc.frequency.exponentialRampToValueAtTime(45 * variation, now + duration * .75);
-    gain.gain.setValueAtTime((type === 'rocket' ? .075 : .095) * intensity, now);
-    gain.gain.exponentialRampToValueAtTime(.001, now + (type === 'rocket' ? .5 : duration));
-    osc.start(now);
-    osc.stop(now + Math.max(duration, .5));
-  } catch { /* Audio is optional; gestures and fireworks continue if audio is unavailable. */ }
-}
-
-function connectProceduralAudio() {
+function connectSampleAudio() {
   director.setSoundCallback((soundType, intensity = 1) => {
-    if (soundType === 'ROCKET_LAUNCH') sound('rocket', 320, intensity);
-    else if (soundType === 'EXPLOSION') sound('boom', 120, intensity);
-    else if (soundType === 'ANAR_LOOP') startNoiseLoop('fountain');
-    else if (soundType === 'ANAR_STOP') stopNoiseLoop('fountain');
-    else if (soundType === 'SPARKLER_LOOP') {
-      startNoiseLoop('sparkler');
-      sound('crackle', 4200, .72);
-    }
-    else if (soundType === 'SPARKLER_STOP') stopNoiseLoop('sparkler');
-    else if (soundType === 'ROMAN_POP') sound('pop', 980, intensity);
-    else if (soundType === 'FINALE') sound('boom', 220, intensity);
+    if (!soundOn) return;
+    if (soundType === 'ROCKET_LAUNCH') audioEngine.playRocketLaunch();
+    else if (soundType === 'EXPLOSION') audioEngine.playExplosion(intensity);
+    else if (soundType === 'ANAR_LOOP') audioEngine.pulseAnarLoop();
+    else if (soundType === 'ANAR_STOP') audioEngine.stopAnarLoop();
+    else if (soundType === 'SPARKLER_LOOP') audioEngine.pulseSparklerLoop();
+    else if (soundType === 'SPARKLER_STOP') audioEngine.stopSparklerLoop();
+    else if (soundType === 'ROMAN_POP') audioEngine.playRomanPop();
+    else if (soundType === 'FINALE') audioEngine.playFinaleBarrage();
   });
+}
+function wakeRenderer() {
+  if (!renderFrameId) {
+    lastFrame = 0;
+    renderFrameId = requestAnimationFrame(animate);
+  }
 }
 
 function animate(timestamp) {
-  requestAnimationFrame(animate);
-  if (lastFrame && timestamp - lastFrame < 15.5) return;
+  renderFrameId = 0;
+  if (!director?.hasActiveEffects && !debugMode) {
+    if (effectsPainted) {
+      ctx.clearRect(0, 0, width, height);
+      effectsPainted = false;
+    }
+    return;
+  }
+  if (lastFrame && timestamp - lastFrame < 15.5) {
+    renderFrameId = requestAnimationFrame(animate);
+    return;
+  }
   const dt = Math.min(.04, Math.max(.001, (timestamp - (lastFrame || timestamp)) / 1000));
   lastFrame = timestamp;
   ctx.clearRect(0, 0, width, height);
   if (director) director.updateAndRender(dt, ctx);
   if (vision && debugMode) vision.drawDebugSkeleton(ctx);
+  effectsPainted = true;
+  renderFrameId = requestAnimationFrame(animate);
 }
-requestAnimationFrame(animate);
 
 function detectFrame(now) {
   if (!running) return;
@@ -186,6 +80,7 @@ function detectFrame(now) {
     try {
       const gestures = vision.update(video, width, height);
       director.handleGestures(gestures, width, height);
+      if (gestures.length) wakeRenderer();
       const gesture = gestures[0];
       if (gesture) {
         const label = soundLabels[gesture.type];
@@ -210,6 +105,7 @@ function detectFrame(now) {
 async function startCamera() {
   $('cameraButton').disabled = true;
   $('cameraButton').textContent = 'STARTING CAMERA…';
+  audioEngine.unlock();
   try {
     if (!navigator.mediaDevices?.getUserMedia) {
       const message = window.isSecureContext
@@ -230,7 +126,7 @@ async function startCamera() {
     ui.live.classList.remove('hidden');
     ui.hint.classList.remove('hidden');
     ui.status.textContent = 'Loading hand tracking…';
-    await vision.init();
+    await Promise.all([vision.init(), audioEngine.ready()]);
     running = true;
     ui.status.textContent = 'Show me a gesture';
     detectFrame(performance.now());
@@ -283,7 +179,7 @@ $('welcomeForm').addEventListener('submit', event => {
   ui.name.classList.remove('hidden');
   ui.intro.classList.add('hidden');
   ui.permission.classList.remove('hidden');
-  ensureAudio();
+  audioEngine.unlock();
 });
 $('cameraButton').addEventListener('click', startCamera);
 $('hintClose').addEventListener('click', () => ui.hint.classList.add('hidden'));
@@ -291,8 +187,8 @@ $('soundToggle').addEventListener('click', () => {
   soundOn = !soundOn;
   $('soundLabel').textContent = soundOn ? 'Sound on' : 'Muted';
   $('soundIcon').textContent = soundOn ? '♫' : '♪';
-  if (audioBus && audio) audioBus.gain.setTargetAtTime(soundOn ? 1 : 0, audio.currentTime, .035);
-  if (soundOn) ensureAudio();
+  audioEngine.toggleMute();
+  if (soundOn) audioEngine.unlock();
 });
 function toggleCreatorMode() {
   creatorMode = !creatorMode;
@@ -354,6 +250,7 @@ $('debugToggle').addEventListener('click', () => {
   debugMode = !debugMode;
   if (vision) vision.showDebug = debugMode;
   $('debugToggle').classList.toggle('active', debugMode);
+  if (debugMode) wakeRenderer();
 });
 window.addEventListener('keydown', event => {
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
@@ -363,25 +260,40 @@ window.addEventListener('keydown', event => {
     debugMode = !debugMode;
     if (vision) vision.showDebug = debugMode;
     $('debugToggle').classList.toggle('active', debugMode);
+    if (debugMode) wakeRenderer();
   } else if (key === 'm') $('soundToggle').click();
   else if (key === 's') takePostcard();
 });
 
 vision = new VisionEngine();
 director = new FireworkDirector();
-connectProceduralAudio();
+audioEngine = new PyroAudioEngine();
+connectSampleAudio();
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && cameraStream) {
-    cameraStream.getTracks().forEach(track => track.enabled = false);
-    stopNoiseLoop('fountain');
-    stopNoiseLoop('sparkler');
+  if (document.hidden) {
+    running = false;
+    cameraStream?.getTracks().forEach(track => track.enabled = false);
+    if ('cancelVideoFrameCallback' in video && videoFrameId) video.cancelVideoFrameCallback(videoFrameId);
+    clearTimeout(fallbackDetectionTimer);
+    audioEngine.stopAnarLoop();
+    audioEngine.stopSparklerLoop();
+    director.clear();
+    if (renderFrameId) cancelAnimationFrame(renderFrameId);
+    renderFrameId = 0;
+    ctx.clearRect(0, 0, width, height);
+    effectsPainted = false;
+  } else if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.enabled = true);
+    running = true;
+    detectFrame(performance.now());
   }
-  else if (cameraStream) cameraStream.getTracks().forEach(track => track.enabled = true);
 });
 window.addEventListener('pagehide', () => {
   running = false;
   if ('cancelVideoFrameCallback' in video && videoFrameId) video.cancelVideoFrameCallback(videoFrameId);
   clearTimeout(fallbackDetectionTimer);
+  if (renderFrameId) cancelAnimationFrame(renderFrameId);
   cameraStream?.getTracks().forEach(track => track.stop());
   vision?.close();
+  audioEngine?.close();
 });
