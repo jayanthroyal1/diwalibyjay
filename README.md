@@ -20,7 +20,7 @@ Open the printed local URL. Camera access works on localhost and secure HTTPS pa
 | Open palm | Starburst |
 | Peace sign | Five-color Roman candle |
 | Thumb and index pinch | Sparkler trail |
-| Korean finger heart | Heart-shaped fireworks |
+| Korean finger heart (thumb/index crossed, other fingers curled) | Heart-shaped fireworks |
 | Two hands together | Grand finale |
 
 Hand landmarks are processed locally with MediaPipe Tasks Vision. Video inference is throttled independently from the canvas animation to keep the visual effects responsive. The front-facing camera is preferred when available.

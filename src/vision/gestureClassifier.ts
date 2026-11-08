@@ -87,7 +87,7 @@ export class GestureClassifier {
 
     // 2. Single-Hand Gestures
     hands.forEach((hand, idx) => {
-      const gesture = this.classifySingleHand(hand, idx, now);
+      const gesture = this.classifySingleHand(hand, idx, now, screenW);
       if (gesture) {
         results.push(gesture);
       }
@@ -99,7 +99,8 @@ export class GestureClassifier {
   private classifySingleHand(
     hand: HandPose,
     handIndex: number,
-    now: number
+    now: number,
+    screenW: number
   ): DetectedGesture | null {
     const { extendedFingers, landmarks, isPinching, palmCenter } = hand;
     const wrist = landmarks[0];
@@ -120,18 +121,24 @@ export class GestureClassifier {
         if (now - pending.since < 170) return null;
         return { type: 'ANAR', confidence: 0.95, triggerPoint: palmCenter, handIndex, handedness: hand.handedness, isContinuous: true };
       }
-      if (supportFingers === 0) {
+      const fingerHeartPose = supportFingers === 0 && extendedFingers.index && extendedFingers.thumb &&
+        hand.pinchDistance < Math.max(26, screenW * 0.027);
+      if (fingerHeartPose) {
         if (!pending || pending.type !== 'FINGER_HEART') {
           this.pendingGesture.set(handIndex, { type: 'FINGER_HEART', since: now });
           return null;
         }
-        if (now - pending.since < 180 || !this.canTrigger('FINGER_HEART', now, handIndex)) return null;
+        if (now - pending.since < 240 || !this.canTrigger('FINGER_HEART', now, handIndex)) return null;
         this.markFired('FINGER_HEART', now, handIndex);
         return {
           type: 'FINGER_HEART', confidence: 0.96,
           triggerPoint: { x: (indexTip.x + thumbTip.x) / 2, y: (indexTip.y + thumbTip.y) / 2 },
           handIndex, handedness: hand.handedness, isContinuous: false
         };
+      }
+      if (supportFingers === 0) {
+        this.pendingGesture.delete(handIndex);
+        return null;
       }
       if (pending && pending.type !== 'PHOOLJHADI') this.pendingGesture.set(handIndex, { type: 'PHOOLJHADI', since: now });
       return {
