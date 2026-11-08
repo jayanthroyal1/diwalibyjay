@@ -144,20 +144,47 @@ function detectionLoop(now) {
 async function startCamera() {
   $('cameraButton').disabled = true; $('cameraButton').textContent = 'STARTING CAMERA…';
   try {
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera access needs HTTPS and a recent browser.');
-    cameraStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'user' }, width: { ideal: 720 }, height: { ideal: 960 }, frameRate: { ideal: 24, max: 30 } } });
-    video.srcObject = cameraStream; await video.play(); app.classList.add('camera-on');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      const secure = window.isSecureContext;
+      throw new Error(secure ? 'This browser does not provide camera access. Open the link in Safari or Chrome.' : 'Camera access requires HTTPS. Open the secure site link in your browser.');
+    }
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'user' }, width: { ideal: 720 }, height: { ideal: 960 }, frameRate: { ideal: 24, max: 30 } } });
+    } catch (firstError) {
+      // Some mobile browsers reject optional size/frame-rate constraints. Retry with the front camera only.
+      try { cameraStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'user' } }); }
+      catch { throw firstError; }
+    }
+    video.srcObject = cameraStream;
+    try { await video.play(); }
+    catch { await new Promise((resolve, reject) => { video.onloadedmetadata = resolve; video.onerror = reject; }); }
+    app.classList.add('camera-on');
     $('permission').classList.add('hidden'); $('liveStatus').classList.remove('hidden'); $('gestureHint').classList.remove('hidden');
     $('statusText').textContent = 'Loading hand tracking…';
+  } catch (error) {
+    cameraStream?.getTracks().forEach(t => t.stop()); cameraStream = null; app.classList.remove('camera-on');
+    const messages = {
+      NotAllowedError: 'Camera permission is blocked. Allow camera access for this site in your browser settings, then retry.',
+      NotFoundError: 'No camera was found on this device.',
+      NotReadableError: 'The camera is busy in another app. Close it and try again.',
+      SecurityError: 'This browser blocked camera access. Open the HTTPS link directly in Safari or Chrome.',
+      OverconstrainedError: 'This camera could not use the requested settings. Try again to use its default settings.',
+    };
+    showToast(messages[error?.name] || `Camera could not start${error?.message ? `: ${error.message}` : '. Check browser camera permission and try again.'}`);
+    $('cameraButton').disabled = false; $('cameraButton').innerHTML = 'TRY CAMERA AGAIN <span>↗</span>';
+    return;
+  }
+  try {
     const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm');
     const trackerOptions = { baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', delegate: 'GPU' }, runningMode: 'VIDEO', numHands: 2, minHandDetectionConfidence: .55, minHandPresenceConfidence: .5, minTrackingConfidence: .5 };
     try { landmarker = await HandLandmarker.createFromOptions(vision, trackerOptions); }
     catch { trackerOptions.baseOptions.delegate = 'CPU'; landmarker = await HandLandmarker.createFromOptions(vision, trackerOptions); }
     running = true; $('statusText').textContent = 'Show me a gesture'; detectionLoop(performance.now());
   } catch (error) {
-    cameraStream?.getTracks().forEach(t => t.stop()); cameraStream = null; app.classList.remove('camera-on');
-    showToast(error.name === 'NotAllowedError' ? 'Camera access was blocked. Allow it in browser settings, then try again.' : `Couldn’t start the camera. ${error.message || 'Check HTTPS and try again.'}`);
-    $('cameraButton').disabled = false; $('cameraButton').innerHTML = 'TRY CAMERA AGAIN <span>↗</span>';
+    // Camera is still usable when a CDN/model is unavailable; tapping the screen launches manual fireworks.
+    $('statusText').textContent = 'Camera ready · tap to launch';
+    showToast('Camera is on, but hand tracking could not load. Tap anywhere to launch fireworks.');
+    $('replay').classList.remove('hidden');
   }
 }
 function showToast(msg) { ui.toast.textContent = msg; ui.toast.classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => ui.toast.classList.add('hidden'), 4800); }
