@@ -35,3 +35,8 @@ npm run preview
 
 The included Actions workflow builds and deploys every push to main. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**. Once the first workflow completes, the site is served from https://jayanthroyal1.github.io/diwalibyjay/ over HTTPS, which supports mobile camera permission prompts. Keep repository name diwalibyjay for this URL.
 
+
+## Recording
+
+Use the Record button to capture the animated canvas and generated Web Audio together as a video file. Recording uses MediaRecorder when supported by the browser; the app synthesizes all effects and downloads no sound files.
+

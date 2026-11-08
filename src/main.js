@@ -7,8 +7,13 @@ const canvas = $('stage'), ctx = canvas.getContext('2d', { alpha: true, desynchr
 const video = $('camera');
 const app = $('app');
 const ui = { intro: $('intro'), permission: $('permission'), live: $('liveStatus'), status: $('statusText'), hint: $('gestureHint'), name: $('celebrationName'), replay: $('replay'), toast: $('toast') };
-let width = 0, height = 0, dpr = 1, particles = [], lastFrame = 0, landmarker, cameraStream, running = false;
-let soundOn = true, audio, lastGesture = '', gestureAt = 0, toastTimer, videoFrameId;
+const PARTICLE_CAPACITY = 3500;
+const particlePool = Array.from({ length: PARTICLE_CAPACITY }, () => ({ x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, color: '#fff', life: 0, max: 1, size: 1, gravity: 0, twinkle: false }));
+const activeParticles = new Int16Array(PARTICLE_CAPACITY), freeParticles = new Int16Array(PARTICLE_CAPACITY);
+for (let i = 0; i < PARTICLE_CAPACITY; i++) freeParticles[i] = PARTICLE_CAPACITY - 1 - i;
+let activeCount = 0, freeCount = PARTICLE_CAPACITY;
+let width = 0, height = 0, dpr = 1, lastFrame = 0, landmarker, cameraStream, running = false;
+let soundOn = true, audio, audioBus, recordDestination, noiseBuffer, recorder, recordChunks = [], lastGesture = '', gestureAt = 0, toastTimer, videoFrameId;
 const colors = ['#ff4d6d', '#57ed9a', '#ffd166', '#54c8ff', '#c084fc', '#fff2cd', '#ff9e43'];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -24,17 +29,41 @@ window.addEventListener('resize', resize, { passive: true }); resize();
 function sound(type, frequency = 500) {
   if (!soundOn) return;
   try {
-    audio ||= new (window.AudioContext || window.webkitAudioContext)();
-    if (audio.state === 'suspended') audio.resume();
-    const now = audio.currentTime, osc = audio.createOscillator(), gain = audio.createGain();
-    osc.connect(gain); gain.connect(audio.destination);
-    if (type === 'fountain') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(120, now); osc.frequency.exponentialRampToValueAtTime(55, now + .55); gain.gain.setValueAtTime(.035, now); gain.gain.exponentialRampToValueAtTime(.001, now + .6); osc.start(now); osc.stop(now + .61); }
-    else { osc.type = type === 'rocket' ? 'triangle' : 'sine'; osc.frequency.setValueAtTime(type === 'rocket' ? 320 : frequency, now); if (type === 'rocket') osc.frequency.exponentialRampToValueAtTime(1550, now + .46); else osc.frequency.exponentialRampToValueAtTime(45, now + .23); gain.gain.setValueAtTime(.11, now); gain.gain.exponentialRampToValueAtTime(.001, now + (type === 'rocket' ? .5 : .3)); osc.start(now); osc.stop(now + .52); }
+    ensureAudio(); if (audio.state === 'suspended') audio.resume();
+    const now = audio.currentTime, variation = .92 + Math.random() * .16, duration = (.28 + Math.random() * .12) * variation;
+    const gain = audio.createGain(); gain.connect(audioBus);
+    if (type === 'fountain' || type === 'crackle') {
+      noiseBuffer ||= makeNoiseBuffer();
+      const source = audio.createBufferSource(), filter = audio.createBiquadFilter();
+      source.buffer = noiseBuffer; filter.type = 'bandpass'; filter.frequency.value = (type === 'fountain' ? 1800 : 4200) * variation; filter.Q.value = type === 'fountain' ? .65 : 1.8;
+      source.connect(filter); filter.connect(gain); gain.gain.setValueAtTime(type === 'fountain' ? .027 : .045, now); gain.gain.exponentialRampToValueAtTime(.001, now + duration);
+      source.start(now); source.stop(now + duration); return;
+    }
+    const osc = audio.createOscillator(); osc.connect(gain);
+    const base = type === 'rocket' ? 320 : frequency; osc.type = type === 'rocket' ? 'triangle' : 'sine';
+    osc.frequency.setValueAtTime(base * variation, now);
+    if (type === 'rocket') osc.frequency.exponentialRampToValueAtTime(1550 * variation, now + .46 * variation);
+    else osc.frequency.exponentialRampToValueAtTime(45 * variation, now + duration * .75);
+    gain.gain.setValueAtTime(type === 'rocket' ? .075 : .095, now); gain.gain.exponentialRampToValueAtTime(.001, now + (type === 'rocket' ? .5 : duration));
+    osc.start(now); osc.stop(now + Math.max(duration, .5));
   } catch { /* audio is an enhancement; the show still runs */ }
 }
 
+function ensureAudio() {
+  audio ||= new (window.AudioContext || window.webkitAudioContext)();
+  if (!audioBus) { audioBus = audio.createGain(); audioBus.connect(audio.destination); recordDestination = audio.createMediaStreamDestination(); audioBus.connect(recordDestination); }
+  return audio;
+}
+function makeNoiseBuffer() {
+  const buffer = audio.createBuffer(1, audio.sampleRate, audio.sampleRate), data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  return buffer;
+}
+
 function addParticle(x, y, vx, vy, color, life, size = 2, gravity = 35, twinkle = false) {
-  if (particles.length < 1800) particles.push({ x, y, px: x, py: y, vx, vy, color, life, max: life, size, gravity, twinkle });
+  if (freeCount === 0) return;
+  const index = freeParticles[--freeCount], p = particlePool[index];
+  p.x = p.px = x; p.y = p.py = y; p.vx = vx; p.vy = vy; p.color = color; p.life = p.max = life; p.size = size; p.gravity = gravity; p.twinkle = twinkle;
 }
 function burst(x, y, count, palette = colors, speed = 240, size = 2.1, gravity = 42) {
   const n = Math.min(count, 260);
@@ -68,7 +97,7 @@ function romanCandle(x, y) {
   palette.forEach((c, i) => setTimeout(() => { sound('boom', 700); rocket(x + (i - 2) * 25, y, c, 36); }, i * 330));
 }
 function sparkler(x, y) {
-  sound('fountain');
+  sound('crackle');
   for (let i = 0; i < 14; i++) {
     const a = Math.random() * Math.PI * 2, r = Math.random() * 27;
     addParticle(x + Math.cos(a) * r, y + Math.sin(a) * r, (Math.random() - .5) * 220, (Math.random() - .5) * 220, colors[Math.floor(Math.random() * colors.length)], .4 + Math.random() * .55, 1 + Math.random() * 2, 25, true);
@@ -84,16 +113,22 @@ function animate(timestamp) {
   requestAnimationFrame(animate);
   const dt = Math.min(.04, Math.max(.001, (timestamp - (lastFrame || timestamp)) / 1000)); lastFrame = timestamp;
   ctx.clearRect(0, 0, width, height);
-  if (particles.length > 0) {
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i]; p.life -= dt;
-      if (p.life <= 0) { particles[i] = particles[particles.length - 1]; particles.pop(); continue; }
+  if (cameraStream && video.readyState >= 2) {
+    ctx.save(); ctx.globalAlpha = .2; ctx.translate(width, 0); ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, width, height); ctx.restore();
+  }
+  if (activeCount > 0) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = activeCount - 1; i >= 0; i--) {
+      const index = activeParticles[i], p = particlePool[index]; p.life -= dt;
+      if (p.life <= 0) { activeParticles[i] = activeParticles[--activeCount]; freeParticles[freeCount++] = index; continue; }
       p.px = p.x; p.py = p.y; p.vy += p.gravity * dt; p.vx *= .995; p.x += p.vx * dt; p.y += p.vy * dt;
       const alpha = clamp(p.life / p.max, 0, 1) * (p.twinkle ? (.64 + Math.sin(timestamp * .03 + p.x) * .35) : 1);
-      ctx.globalAlpha = alpha; ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = p.size * 4;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (p.life < .25 ? p.life / .25 : 1), 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = alpha; ctx.strokeStyle = p.color; ctx.lineWidth = Math.max(.7, p.size); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p.px, p.py); ctx.lineTo(p.x, p.y); ctx.stroke();
+      ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size * .55, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   }
 }
 requestAnimationFrame(animate);
@@ -193,13 +228,36 @@ $('welcomeForm').addEventListener('submit', (event) => {
   event.preventDefault();
   const person = $('nameInput').value.trim(); if (!person) return;
   $('greetingTitle').textContent = `HAPPY DIWALI 2026, ${person.toUpperCase()} ✨`; ui.name.classList.remove('hidden'); ui.intro.classList.add('hidden'); ui.permission.classList.remove('hidden');
-  audio ||= new (window.AudioContext || window.webkitAudioContext)();
+  ensureAudio(); audio.resume();
 });
 $('cameraButton').addEventListener('click', startCamera);
 $('skipCamera').addEventListener('click', () => { ui.permission.classList.add('hidden'); ui.live.classList.remove('hidden'); $('statusText').textContent = 'Tap to light the sky'; ui.replay.classList.remove('hidden'); });
 $('replay').addEventListener('click', finale);
 $('hintClose').addEventListener('click', () => ui.hint.classList.add('hidden'));
 $('soundToggle').addEventListener('click', () => { soundOn = !soundOn; $('soundLabel').textContent = soundOn ? 'Sound on' : 'Sound off'; $('soundIcon').textContent = soundOn ? '♫' : '♪'; });
+function startRecording() {
+  try {
+    if (!window.MediaRecorder || !canvas.captureStream) throw new Error('Video recording is not supported in this browser.');
+    ensureAudio(); if (audio.state === 'suspended') audio.resume();
+    const videoStream = canvas.captureStream(30), mixed = new MediaStream([...videoStream.getVideoTracks(), ...recordDestination.stream.getAudioTracks()]);
+    const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find(type => MediaRecorder.isTypeSupported(type));
+    recorder = mime ? new MediaRecorder(mixed, { mimeType: mime }) : new MediaRecorder(mixed);
+    recordChunks = []; recorder.ondataavailable = e => { if (e.data.size) recordChunks.push(e.data); };
+    recorder.onstop = () => {
+      const type = recorder.mimeType || 'video/webm', ext = type.includes('mp4') ? 'mp4' : 'webm';
+      const blob = new Blob(recordChunks, { type }), url = URL.createObjectURL(blob), link = document.createElement('a');
+      link.href = url; link.download = `diwali-2026.${ext}`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1500);
+      videoStream.getTracks().forEach(track => track.stop()); mixed.getTracks().forEach(track => track.stop()); recordChunks = [];
+      $('recordLabel').textContent = 'Record'; $('recordToggle').classList.remove('recording'); $('recordToggle').setAttribute('aria-label', 'Record fireworks');
+      showToast('Your Diwali video has been saved.');
+    };
+    recorder.start(250); $('recordLabel').textContent = 'Stop'; $('recordToggle').classList.add('recording'); $('recordToggle').setAttribute('aria-label', 'Stop recording');
+    showToast('Recording fireworks with synthesized audio.');
+  } catch (error) { showToast(error.message || 'Recording is not supported in this browser.'); }
+}
+$('recordToggle').addEventListener('click', () => {
+  if (recorder?.state === 'recording') recorder.stop(); else startRecording();
+});
 // A first burst makes the no-camera path interactive and gives the page a festive heartbeat.
 let tapTimer = 0;
 canvas.addEventListener('pointerdown', (e) => {
