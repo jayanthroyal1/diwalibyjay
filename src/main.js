@@ -15,7 +15,7 @@ let width = 0, height = 0, dpr = 1, lastFrame = 0, cameraStream, running = false
 let soundOn = true, audioEngine, vision, director, debugMode = false, creatorMode = false;
 let videoFrameId = 0, renderFrameId = 0, fallbackDetectionTimer = 0, lastDetection = 0, finaleTimer = 0, toastTimer = 0, lastStatusGesture = '';
 let effectsPainted = false;
-const soundLabels = { ROCKET: 'Rocket', ANAR: 'Anar fountain', STARBURST: 'Starburst', ROMAN_CANDLE: 'Roman candle', PHOOLJHADI: 'Sparkler', GRAND_FINALE: 'Grand finale' };
+const soundLabels = { ROCKET: 'Rocket', ANAR: 'Anar fountain', STARBURST: 'Starburst', ROMAN_CANDLE: 'Roman candle', PHOOLJHADI: 'Sparkler', FINGER_HEART: 'Heart burst', GRAND_FINALE: 'Grand finale' };
 
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 700 ? 1 : 1.35);
@@ -36,6 +36,7 @@ function connectSampleAudio() {
     if (!soundOn) return;
     if (soundType === 'ROCKET_LAUNCH') audioEngine.playRocketLaunch();
     else if (soundType === 'EXPLOSION') audioEngine.playExplosion(intensity);
+    else if (soundType === 'HEART_BURST') audioEngine.playHeartBurst();
     else if (soundType === 'ANAR_LOOP') audioEngine.pulseAnarLoop();
     else if (soundType === 'ANAR_STOP') audioEngine.stopAnarLoop();
     else if (soundType === 'SPARKLER_LOOP') audioEngine.pulseSparklerLoop();

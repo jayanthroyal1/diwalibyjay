@@ -199,6 +199,11 @@ export class PyroAudioEngine {
     this.playSample('ROMAN_POP', 0.85, 0.08);
   }
 
+  public playHeartBurst(): void {
+    this.playSample('STARBURST', 0.92, 0.035);
+    this.playSample('THUNDER_CRACK', 0.5, 0.055);
+  }
+
   /**
    * 4. Grand Finale Multi-Burst
    */

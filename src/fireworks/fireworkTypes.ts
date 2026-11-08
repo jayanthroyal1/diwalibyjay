@@ -6,6 +6,6 @@ export interface FireworkEffect {
 }
 
 export type SoundTriggerCallback = (
-  soundType: 'ROCKET_LAUNCH' | 'EXPLOSION' | 'ANAR_LOOP' | 'ANAR_STOP' | 'SPARKLER_LOOP' | 'SPARKLER_STOP' | 'ROMAN_POP' | 'FINALE',
+  soundType: 'ROCKET_LAUNCH' | 'EXPLOSION' | 'HEART_BURST' | 'ANAR_LOOP' | 'ANAR_STOP' | 'SPARKLER_LOOP' | 'SPARKLER_STOP' | 'ROMAN_POP' | 'FINALE',
   intensity?: number
 ) => void;

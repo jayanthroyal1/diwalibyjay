@@ -6,6 +6,7 @@ import { Starburst } from './starburst';
 import { RomanCandle } from './romanCandle';
 import { Sparkler } from './sparkler';
 import { GrandFinale } from './grandFinale';
+import { HeartBurst } from './heartBurst';
 import { DetectedGesture } from '../vision/gestureTypes';
 import { COLORS } from './fireworkColors';
 
@@ -83,6 +84,11 @@ export class FireworkDirector {
           } else {
             sparkler.updatePosition(triggerPoint.x, triggerPoint.y);
           }
+          break;
+        }
+
+        case 'FINGER_HEART': {
+          this.effects.push(new HeartBurst(triggerPoint.x, triggerPoint.y, this.onSound));
           break;
         }
 

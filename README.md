@@ -1,6 +1,6 @@
 # Diwali by Jay
 
-A small, mobile-first Diwali fireworks experience. Enter a name, allow camera access, and use hand gestures to launch six kinds of fireworks. Camera frames and hand tracking stay on the device; the app does not record or upload video.
+A small, mobile-first Diwali fireworks experience. Enter a name, allow camera access, and use hand gestures to launch seven kinds of fireworks. Camera frames and hand tracking stay on the device; the app does not record or upload video.
 
 ## Run locally
 
@@ -16,10 +16,11 @@ Open the printed local URL. Camera access works on localhost and secure HTTPS pa
 | Gesture | Effect |
 | --- | --- |
 | Index finger up | Rocket peony |
-| Closed fist | Anar fountain |
+| OK sign (thumb and index touching, other fingers open) | Anar fountain |
 | Open palm | Starburst |
 | Peace sign | Five-color Roman candle |
 | Thumb and index pinch | Sparkler trail |
+| Korean finger heart | Heart-shaped fireworks |
 | Two hands together | Grand finale |
 
 Hand landmarks are processed locally with MediaPipe Tasks Vision. Video inference is throttled independently from the canvas animation to keep the visual effects responsive. The front-facing camera is preferred when available.

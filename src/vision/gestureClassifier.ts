@@ -17,6 +17,7 @@ export class GestureClassifier {
     STARBURST: 850,
     ROMAN_CANDLE: 300,
     PHOOLJHADI: 0, // Continuous
+    FINGER_HEART: 1100,
     GRAND_FINALE: 4000
   };
 
@@ -106,19 +107,37 @@ export class GestureClassifier {
     const indexTip = landmarks[8];
     const thumbTip = landmarks[4];
 
-    // Priority 2: Phooljhadi (Pinch)
+    // Pinch-family poses are separated by the three supporting fingers:
+    // OK sign (2-3 extended) => Anar, Korean finger heart (all curled) => heart shell.
     if (isPinching) {
-      this.pendingGesture.delete(handIndex);
+      const supportFingers = [extendedFingers.middle, extendedFingers.ring, extendedFingers.pinky].filter(Boolean).length;
+      const pending = this.pendingGesture.get(handIndex);
+      if (supportFingers >= 2) {
+        if (!pending || pending.type !== 'ANAR') {
+          this.pendingGesture.set(handIndex, { type: 'ANAR', since: now });
+          return null;
+        }
+        if (now - pending.since < 170) return null;
+        return { type: 'ANAR', confidence: 0.95, triggerPoint: palmCenter, handIndex, handedness: hand.handedness, isContinuous: true };
+      }
+      if (supportFingers === 0) {
+        if (!pending || pending.type !== 'FINGER_HEART') {
+          this.pendingGesture.set(handIndex, { type: 'FINGER_HEART', since: now });
+          return null;
+        }
+        if (now - pending.since < 180 || !this.canTrigger('FINGER_HEART', now, handIndex)) return null;
+        this.markFired('FINGER_HEART', now, handIndex);
+        return {
+          type: 'FINGER_HEART', confidence: 0.96,
+          triggerPoint: { x: (indexTip.x + thumbTip.x) / 2, y: (indexTip.y + thumbTip.y) / 2 },
+          handIndex, handedness: hand.handedness, isContinuous: false
+        };
+      }
+      if (pending && pending.type !== 'PHOOLJHADI') this.pendingGesture.set(handIndex, { type: 'PHOOLJHADI', since: now });
       return {
-        type: 'PHOOLJHADI',
-        confidence: 0.95,
-        triggerPoint: {
-          x: (indexTip.x + thumbTip.x) / 2,
-          y: (indexTip.y + thumbTip.y) / 2
-        },
-        handIndex,
-        handedness: hand.handedness,
-        isContinuous: true
+        type: 'PHOOLJHADI', confidence: 0.95,
+        triggerPoint: { x: (indexTip.x + thumbTip.x) / 2, y: (indexTip.y + thumbTip.y) / 2 },
+        handIndex, handedness: hand.handedness, isContinuous: true
       };
     }
 
@@ -157,19 +176,6 @@ export class GestureClassifier {
       };
       isContinuous = false;
     }
-    // Priority 5: Anar (✊ Closed Fist: All fingers curled into palm)
-    else if (
-      !extendedFingers.index &&
-      !extendedFingers.middle &&
-      !extendedFingers.ring &&
-      !extendedFingers.pinky &&
-      !extendedFingers.thumb
-    ) {
-      candidate = 'ANAR';
-      const fistTop = landmarks[9] || palmCenter;
-      triggerPoint = { x: fistTop.x, y: fistTop.y - 10 };
-      isContinuous = true;
-    }
     // Priority 6: Starburst (✋ Open Palm: All 5 fingers extended spread apart)
     else if (this.isAllFingersExtended(hand)) {
       candidate = 'STARBURST';
@@ -189,7 +195,8 @@ export class GestureClassifier {
       return null;
     }
 
-    if (now - pending.since < this.HOLD_REQUIRED_MS) {
+    const requiredHold = candidate === 'STARBURST' ? 170 : this.HOLD_REQUIRED_MS;
+    if (now - pending.since < requiredHold) {
       return null;
     }
 
@@ -214,10 +221,13 @@ export class GestureClassifier {
   private isAllFingersExtended(hand: HandPose): boolean {
     const { extendedFingers } = hand;
     return (
+      extendedFingers.thumb &&
       extendedFingers.index &&
       extendedFingers.middle &&
       extendedFingers.ring &&
-      extendedFingers.pinky
+      extendedFingers.pinky &&
+      Math.hypot(hand.landmarks[4].x - hand.landmarks[20].x, hand.landmarks[4].y - hand.landmarks[20].y) >
+        Math.hypot(hand.landmarks[5].x - hand.landmarks[17].x, hand.landmarks[5].y - hand.landmarks[17].y) * 1.65
     );
   }
 
