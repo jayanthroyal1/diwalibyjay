@@ -24,6 +24,8 @@ Open the printed local URL. Camera access works on localhost and secure HTTPS pa
 
 Hand landmarks are processed locally with MediaPipe Tasks Vision. Video inference is throttled independently from the canvas animation to keep the visual effects responsive. The front-facing camera is preferred when available.
 
+The effects use separate generators for each gesture, a preallocated 3,500-particle pool, additive trails, and procedural Web Audio. The camera stream is drawn once into the same mirrored canvas as the effects, avoiding the duplicate video layer some mobile browsers showed. The camera video itself remains hidden and is used only for hand tracking.
+
 ## Build
 
 ```sh

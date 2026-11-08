@@ -1,0 +1,79 @@
+/* Video is an inference-only source. The stage canvas composites it once with the fireworks. */
+#camera,
+#app.camera-on #camera {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  inset: auto auto 0 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: scaleX(-1);
+}
+
+/* Keep gesture instructions clear of the greeting on narrow phone screens. */
+@media (max-width: 700px) {
+  .gesture-hint {
+    top: 126px;
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    z-index: 3;
+    max-width: calc(100vw - 28px);
+  }
+
+  .celebration-name {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    left: 14px;
+    right: 14px;
+    gap: 6px;
+  }
+
+  .celebration-name strong { line-height: 1.08; }
+  .celebration-name small { max-width: 34ch; line-height: 1.4; }
+  .footer { bottom: max(12px, env(safe-area-inset-bottom)); }
+}
+
+@media (max-height: 740px) and (max-width: 700px) {
+  .gesture-hint { top: 112px; }
+  .celebration-name { bottom: calc(52px + env(safe-area-inset-bottom)); }
+  .celebration-name small { display: none; }
+}
+
+@media (max-width: 380px) {
+  .gesture-hint { top: 118px; width: calc(100vw - 24px); padding: 10px 12px; }
+  .celebration-name { bottom: calc(75px + env(safe-area-inset-bottom)); }
+}
+
+.grand-finale {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  pointer-events: none;
+  animation: finale-arrive .65s ease both;
+}
+
+.grand-finale-card {
+  position: relative;
+  width: min(650px, 94vw);
+  padding: clamp(25px, 6vw, 58px) 20px;
+  text-align: center;
+  color: #fff4d3;
+  border: 1px solid #ffd9959c;
+  border-radius: 24px;
+  background: radial-gradient(ellipse at 50% 45%, #4a2b3dd9, #1a1126dc 78%);
+  box-shadow: 0 0 70px #ffb94c55, inset 0 0 45px #ffcd7b12;
+  backdrop-filter: blur(12px) saturate(1.2);
+}
+
+.grand-finale-card > img { position: absolute; top: 50%; width: 42px; height: 54px; transform: translateY(-50%); filter: drop-shadow(0 0 18px #ffc368); }
+.grand-finale-card > img:first-of-type { left: 14px; }
+.grand-finale-card > img:last-of-type { right: 14px; }
+.finale-flowers { position: absolute; top: -13px; left: 50%; display: flex; gap: 12px; transform: translateX(-50%); }
+.finale-flowers img { width: 22px; height: 22px; filter: drop-shadow(0 0 10px #ffc368); }
+.finale-eyebrow { color: #ffd58d; font-size: 9px; letter-spacing: .34em; }
+.finale-title { margin: 12px 0 8px; font: 600 clamp(27px, 7vw, 54px)/1.1 'Playfair Display', Georgia, serif; text-shadow: 0 0 24px #ffd47b; }
+.finale-quote { margin: 0; color: #f5dfce; font: italic clamp(12px, 3vw, 16px) 'Playfair Display', Georgia, serif; }
+@keyframes finale-arrive { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
