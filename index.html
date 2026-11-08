@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#100b18" />
+    <meta name="description" content="A little Diwali magic, made with your hands." />
+    <title>Diwali by Jay — Light up the night</title>
+  </head>
+  <body>
+    <main id="app">
+      <video id="camera" autoplay playsinline muted></video>
+      <canvas id="stage" aria-label="Interactive Diwali fireworks"></canvas>
+      <div class="vignette"></div>
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Diwali by Jay home"><span class="brand-mark">✦</span><span>diwali<span class="brand-light">by jay</span></span></a>
+        <button class="sound-toggle" id="soundToggle" aria-label="Toggle sound"><span id="soundIcon">♫</span><span id="soundLabel">Sound on</span></button>
+      </header>
+      <section class="intro" id="intro">
+        <div class="eyebrow"><span></span> A LITTLE FESTIVE MAGIC</div>
+        <h1>Light up<br/>the <span>night.</span></h1>
+        <p>Your hands are the spark. Make a gesture and watch the sky celebrate.</p>
+        <form id="welcomeForm" class="welcome-form">
+          <label for="nameInput">WHAT SHOULD WE CALL YOU?</label>
+          <div class="name-entry"><input id="nameInput" maxlength="24" placeholder="Your name" autocomplete="given-name" required/><button type="submit" aria-label="Start the celebration">LET’S GO <span>↗</span></button></div>
+          <small>Camera stays on your device. Nothing is recorded.</small>
+        </form>
+      </section>
+      <section id="permission" class="permission hidden"><div class="permission-icon">◎</div><h2>Give your camera a moment</h2><p>Allow camera access to use your hand gestures. Your front camera is preferred.</p><button id="cameraButton">ENABLE CAMERA <span>↗</span></button><button id="skipCamera" class="text-button">Continue without camera</button><small>Camera needs HTTPS (or localhost) and your permission.</small></section>
+      <div class="live-status hidden" id="liveStatus"><span class="status-dot"></span><span id="statusText">Show me a gesture</span></div>
+      <div class="gesture-hint hidden" id="gestureHint"><span class="hint-icon">☝</span><span><b>Try a gesture</b><small>Point up · open your palm · make a heart</small></span><button id="hintClose" aria-label="Dismiss gesture tips">×</button></div>
+      <div id="celebrationName" class="celebration-name hidden" aria-live="polite"><strong id="greetingTitle"></strong><span id="greetingFrom">FROM JAYANTH</span><small>“May your life shine as brightly as the lights of Diwali.”</small></div>
+      <button class="replay hidden" id="replay">✦ &nbsp; LIGHT IT UP</button>
+      <div class="toast hidden" id="toast"></div>
+      <footer class="footer"><span>MADE FOR THE MOMENTS THAT SPARKLE</span><span class="diya">🪔</span><span>HAPPY DIWALI</span></footer>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

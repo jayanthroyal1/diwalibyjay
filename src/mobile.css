@@ -1,0 +1,5 @@
+/* Camera preview and canvas stay behind the interface; inference runs at a lower cadence. */
+#camera{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;z-index:-2;transition:opacity .8s ease}
+#app.camera-on #camera{opacity:.23}
+#stage{z-index:-1}
+@media(max-width:650px){#app.camera-on #camera{opacity:.2}}
