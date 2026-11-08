@@ -88,7 +88,7 @@ export class FireworkDirector {
         }
 
         case 'FINGER_HEART': {
-          this.effects.push(new HeartBurst(triggerPoint.x, triggerPoint.y, this.onSound));
+          this.effects.push(new HeartBurst(triggerPoint.x, triggerPoint.y, screenH, this.onSound));
           break;
         }
 
