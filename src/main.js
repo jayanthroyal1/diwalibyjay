@@ -6,14 +6,14 @@ const $ = (id) => document.getElementById(id);
 const canvas = $('stage'), ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
 const video = $('camera');
 const app = $('app');
-const ui = { intro: $('intro'), permission: $('permission'), live: $('liveStatus'), status: $('statusText'), hint: $('gestureHint'), name: $('celebrationName'), replay: $('replay'), toast: $('toast') };
+const ui = { intro: $('intro'), permission: $('permission'), live: $('liveStatus'), status: $('statusText'), hint: $('gestureHint'), name: $('celebrationName'), toast: $('toast') };
 const PARTICLE_CAPACITY = 3500;
 const particlePool = Array.from({ length: PARTICLE_CAPACITY }, () => ({ x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, color: '#fff', life: 0, max: 1, size: 1, gravity: 0, twinkle: false }));
 const activeParticles = new Int16Array(PARTICLE_CAPACITY), freeParticles = new Int16Array(PARTICLE_CAPACITY);
 for (let i = 0; i < PARTICLE_CAPACITY; i++) freeParticles[i] = PARTICLE_CAPACITY - 1 - i;
 let activeCount = 0, freeCount = PARTICLE_CAPACITY;
 let width = 0, height = 0, dpr = 1, lastFrame = 0, landmarker, cameraStream, running = false;
-let soundOn = true, audio, audioBus, recordDestination, noiseBuffer, recorder, recordChunks = [], lastGesture = '', gestureAt = 0, toastTimer, videoFrameId;
+let soundOn = true, audio, audioBus, noiseBuffer, lastGesture = '', gestureAt = 0, toastTimer, videoFrameId, debugHands = [], debugMode = false, creatorMode = false;
 const colors = ['#ff4d6d', '#57ed9a', '#ffd166', '#54c8ff', '#c084fc', '#fff2cd', '#ff9e43'];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -51,7 +51,7 @@ function sound(type, frequency = 500) {
 
 function ensureAudio() {
   audio ||= new (window.AudioContext || window.webkitAudioContext)();
-  if (!audioBus) { audioBus = audio.createGain(); audioBus.connect(audio.destination); recordDestination = audio.createMediaStreamDestination(); audioBus.connect(recordDestination); }
+  if (!audioBus) { audioBus = audio.createGain(); audioBus.connect(audio.destination); }
   return audio;
 }
 function makeNoiseBuffer() {
@@ -106,7 +106,7 @@ function sparkler(x, y) {
 function finale() {
   for (let i = 0; i < 18; i++) setTimeout(() => rocket(width * (.12 + Math.random() * .76), height * (.52 + Math.random() * .23), colors[i % colors.length], 100), i * 190);
   setTimeout(() => { for (let i = 0; i < 5; i++) setTimeout(() => burst(width * (.12 + i * .19), height * (.32 + Math.random() * .12), 180, colors, 280, 2.2, 45), i * 160); }, 1100);
-  setTimeout(() => { $('replay').classList.remove('hidden'); sound('boom'); }, 4500);
+  setTimeout(() => sound('boom'), 4500);
 }
 
 function animate(timestamp) {
@@ -130,11 +130,24 @@ function animate(timestamp) {
     }
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   }
+  if (debugMode && debugHands.length) drawDebugHands();
 }
 requestAnimationFrame(animate);
 
+function drawDebugHands() {
+  const bones = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+  ctx.save(); ctx.lineWidth = 2; ctx.strokeStyle = '#75ffd0'; ctx.fillStyle = '#fff2ad'; ctx.shadowColor = '#75ffd0'; ctx.shadowBlur = 8;
+  for (const hand of debugHands) {
+    ctx.beginPath();
+    for (const [a, b] of bones) { ctx.moveTo((1 - hand[a].x) * width, hand[a].y * height); ctx.lineTo((1 - hand[b].x) * width, hand[b].y * height); }
+    ctx.stroke();
+    for (const point of hand) { ctx.beginPath(); ctx.arc((1 - point.x) * width, point.y * height, 3, 0, Math.PI * 2); ctx.fill(); }
+  }
+  ctx.restore();
+}
+
 // Landmark indices use MediaPipe's 21 point hand topology. Webcam inference is
-// throttled to 12.5fps; the canvas remains independently animated at display FPS.
+// throttled to about 18fps; the canvas remains independently animated at display FPS.
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 function classify(hands) {
   if (!hands?.length) return null;
@@ -154,6 +167,7 @@ const gestureNames = { rocket: 'Rocket', fist: 'Anar fountain', palm: 'Starburst
 let lastPinchSpark = 0, lastFountain = 0;
 function processHands(result) {
   const hands = result?.landmarks || [], g = classify(hands);
+  debugHands = hands;
   if (!g) { lastGesture = ''; return; }
   const hand = hands[0], tip = hand[8], x = (1 - tip.x) * width, y = tip.y * height;
   if (g === 'pinch') { if (performance.now() - lastPinchSpark > 85) { sparkler(x, y); lastPinchSpark = performance.now(); } return; }
@@ -168,7 +182,7 @@ function processHands(result) {
 let lastDetect = 0;
 function detectionLoop(now) {
   if (!running) return;
-  if (video.readyState >= 2 && now - lastDetect > 80) {
+  if (video.readyState >= 2 && now - lastDetect > 55) {
     lastDetect = now;
     try { const result = landmarker.detectForVideo(video, now); processHands(result); } catch { /* camera may be transitioning */ }
   }
@@ -184,7 +198,7 @@ async function startCamera() {
       throw new Error(secure ? 'This browser does not provide camera access. Open the link in Safari or Chrome.' : 'Camera access requires HTTPS. Open the secure site link in your browser.');
     }
     try {
-      cameraStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'user' }, width: { ideal: 720 }, height: { ideal: 960 }, frameRate: { ideal: 24, max: 30 } } });
+      cameraStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'user' }, width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 30 } } });
     } catch (firstError) {
       // Some mobile browsers reject optional size/frame-rate constraints. Retry with the front camera only.
       try { cameraStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'user' } }); }
@@ -218,10 +232,8 @@ async function startCamera() {
     catch { trackerOptions.baseOptions.delegate = 'CPU'; landmarker = await HandLandmarker.createFromOptions(vision, trackerOptions); }
     running = true; $('statusText').textContent = 'Show me a gesture'; detectionLoop(performance.now());
   } catch (error) {
-    // Camera is still usable when a CDN/model is unavailable; tapping the screen launches manual fireworks.
-    $('statusText').textContent = 'Camera ready · tap to launch';
-    showToast('Camera is on, but hand tracking could not load. Tap anywhere to launch fireworks.');
-    $('replay').classList.remove('hidden');
+    $('statusText').textContent = 'Hand tracking unavailable';
+    showToast('The camera is on, but hand tracking could not load. Reload the page and try again.');
   }
 }
 function showToast(msg) { ui.toast.textContent = msg; ui.toast.classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => ui.toast.classList.add('hidden'), 4800); }
@@ -232,39 +244,54 @@ $('welcomeForm').addEventListener('submit', (event) => {
   $('greetingTitle').textContent = `HAPPY DIWALI 2026, ${person.toUpperCase()} ✨`; ui.name.classList.remove('hidden'); ui.intro.classList.add('hidden'); ui.permission.classList.remove('hidden');
   ensureAudio(); audio.resume();
 });
-$('cameraButton').addEventListener('click', startCamera);
-$('skipCamera').addEventListener('click', () => { ui.permission.classList.add('hidden'); ui.live.classList.remove('hidden'); $('statusText').textContent = 'Tap to light the sky'; ui.replay.classList.remove('hidden'); });
-$('replay').addEventListener('click', finale);
-$('hintClose').addEventListener('click', () => ui.hint.classList.add('hidden'));
-$('soundToggle').addEventListener('click', () => { soundOn = !soundOn; $('soundLabel').textContent = soundOn ? 'Sound on' : 'Sound off'; $('soundIcon').textContent = soundOn ? '♫' : '♪'; });
-function startRecording() {
-  try {
-    if (!window.MediaRecorder || !canvas.captureStream) throw new Error('Video recording is not supported in this browser.');
-    ensureAudio(); if (audio.state === 'suspended') audio.resume();
-    const videoStream = canvas.captureStream(30), mixed = new MediaStream([...videoStream.getVideoTracks(), ...recordDestination.stream.getAudioTracks()]);
-    const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find(type => MediaRecorder.isTypeSupported(type));
-    recorder = mime ? new MediaRecorder(mixed, { mimeType: mime }) : new MediaRecorder(mixed);
-    recordChunks = []; recorder.ondataavailable = e => { if (e.data.size) recordChunks.push(e.data); };
-    recorder.onstop = () => {
-      const type = recorder.mimeType || 'video/webm', ext = type.includes('mp4') ? 'mp4' : 'webm';
-      const blob = new Blob(recordChunks, { type }), url = URL.createObjectURL(blob), link = document.createElement('a');
-      link.href = url; link.download = `diwali-2026.${ext}`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1500);
-      videoStream.getTracks().forEach(track => track.stop()); mixed.getTracks().forEach(track => track.stop()); recordChunks = [];
-      $('recordLabel').textContent = 'Record'; $('recordToggle').classList.remove('recording'); $('recordToggle').setAttribute('aria-label', 'Record fireworks');
-      showToast('Your Diwali video has been saved.');
-    };
-    recorder.start(250); $('recordLabel').textContent = 'Stop'; $('recordToggle').classList.add('recording'); $('recordToggle').setAttribute('aria-label', 'Stop recording');
-    showToast('Recording fireworks with synthesized audio.');
-  } catch (error) { showToast(error.message || 'Recording is not supported in this browser.'); }
+const nameInput = $('nameInput');
+let baselineViewportHeight = window.visualViewport?.height || window.innerHeight;
+function syncKeyboardViewport() {
+  const visualHeight = window.visualViewport?.height || window.innerHeight;
+  document.documentElement.style.setProperty('--visual-height', `${visualHeight}px`);
+  const editing = document.activeElement === nameInput;
+  if (!editing) baselineViewportHeight = visualHeight;
+  document.documentElement.classList.toggle('keyboard-open', editing && visualHeight < baselineViewportHeight * .82);
 }
-$('recordToggle').addEventListener('click', () => {
-  if (recorder?.state === 'recording') recorder.stop(); else startRecording();
-});
-// A first burst makes the no-camera path interactive and gives the page a festive heartbeat.
-let tapTimer = 0;
-canvas.addEventListener('pointerdown', (e) => {
-  if (ui.intro.classList.contains('hidden') && !ui.permission.classList.contains('hidden')) return;
-  if (!running) { const now = performance.now(); if (now - tapTimer > 500) burst(e.clientX, e.clientY, 85, colors, 210, 1.8, 45); tapTimer = now; }
+nameInput.addEventListener('focus', syncKeyboardViewport);
+nameInput.addEventListener('blur', () => setTimeout(syncKeyboardViewport, 120));
+window.visualViewport?.addEventListener('resize', syncKeyboardViewport, { passive: true });
+window.visualViewport?.addEventListener('scroll', syncKeyboardViewport, { passive: true });
+window.addEventListener('resize', syncKeyboardViewport, { passive: true });
+syncKeyboardViewport();
+$('cameraButton').addEventListener('click', startCamera);
+$('hintClose').addEventListener('click', () => ui.hint.classList.add('hidden'));
+$('soundToggle').addEventListener('click', () => { soundOn = !soundOn; $('soundLabel').textContent = soundOn ? 'Sound on' : 'Muted'; $('soundIcon').textContent = soundOn ? '♫' : '♪'; });
+function toggleCreatorMode() {
+  creatorMode = !creatorMode; app.classList.toggle('creator-mode', creatorMode);
+  $('restoreHud').classList.toggle('hidden', !creatorMode);
+}
+function takePostcard() {
+  const snap = document.createElement('canvas'); snap.width = canvas.width; snap.height = canvas.height;
+  const shot = snap.getContext('2d'); shot.drawImage(canvas, 0, 0);
+  shot.save(); shot.scale(dpr, dpr);
+  const gradient = shot.createLinearGradient(0, height - 110, 0, height); gradient.addColorStop(0, 'transparent'); gradient.addColorStop(1, 'rgba(16,8,22,.74)');
+  shot.fillStyle = gradient; shot.fillRect(0, height - 110, width, 110);
+  shot.textAlign = 'center'; shot.fillStyle = '#fff0c5'; shot.shadowColor = '#ffb94c'; shot.shadowBlur = 18;
+  shot.font = `600 ${Math.max(24, Math.min(48, width * .055))}px Georgia, serif`; shot.fillText('✨ Happy Diwali 2026 ✨', width / 2, height - 54);
+  shot.font = '600 12px Arial, sans-serif'; shot.shadowBlur = 0; shot.fillStyle = '#ffd999'; shot.fillText('FROM JAYANTH G', width / 2, height - 27); shot.restore();
+  snap.toBlob(blob => {
+    if (!blob) return showToast('Could not save the postcard in this browser.');
+    const url = URL.createObjectURL(blob), link = document.createElement('a'); link.href = url; link.download = 'happy-diwali-2026.png'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1500);
+    showToast('Your Diwali postcard has been saved.');
+  }, 'image/png');
+}
+$('postcardButton').addEventListener('click', takePostcard);
+$('creatorToggle').addEventListener('click', toggleCreatorMode);
+$('restoreHud').addEventListener('click', toggleCreatorMode);
+$('debugToggle').addEventListener('click', () => { debugMode = !debugMode; $('debugToggle').classList.toggle('active', debugMode); });
+window.addEventListener('keydown', event => {
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+  const key = event.key.toLowerCase();
+  if (key === 'h') toggleCreatorMode();
+  else if (key === 'd') { debugMode = !debugMode; $('debugToggle').classList.toggle('active', debugMode); }
+  else if (key === 'm') $('soundToggle').click();
+  else if (key === 's') takePostcard();
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden && cameraStream) cameraStream.getTracks().forEach(t => t.enabled = false); else if (cameraStream) cameraStream.getTracks().forEach(t => t.enabled = true); });
 window.addEventListener('pagehide', () => { running = false; cameraStream?.getTracks().forEach(t => t.stop()); landmarker?.close(); });

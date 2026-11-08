@@ -5,8 +5,8 @@ A small, mobile-first Diwali fireworks experience. Enter a name, allow camera ac
 ## Run locally
 
 ```sh
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 Open the printed local URL. Camera access works on localhost and secure HTTPS pages. On a phone, deploy the site to an HTTPS host before requesting camera access.
@@ -27,18 +27,13 @@ Hand landmarks are processed locally with MediaPipe Tasks Vision. Video inferenc
 ## Build
 
 ```sh
-npm run build
-npm run preview
+pnpm build
+pnpm preview
 ```
 
 ## Publish on GitHub Pages
 
 The included Actions workflow builds and deploys every push to main. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**. Once the first workflow completes, the site is served from https://jayanthroyal1.github.io/diwalibyjay/ over HTTPS, which supports mobile camera permission prompts. Keep repository name diwalibyjay for this URL.
-
-
-## Recording
-
-Use the Record button to capture the animated canvas and generated Web Audio together as a video file. Recording uses MediaRecorder when supported by the browser; the app synthesizes all effects and downloads no sound files.
 
 
 MediaPipe's WASM runtime and hand landmark model are served from the same GitHub Pages site to avoid third-party asset-host failures.
@@ -48,4 +43,14 @@ The site includes an Open Graph social image and WhatsApp/Teams-friendly metadat
 
 
 Use the cache-busted share URL https://jayanthroyal1.github.io/diwalibyjay/?share=diwali2026-jayanthg when sending the updated card preview.
+
+
+## Controls
+
+- Hand gestures alone launch fireworks.
+- Save a festive postcard with **Postcard** or S.
+- Hide the interface with **Clean** or H; restore it with the on-screen button.
+- Toggle the hand landmark skeleton with **Debug** or D.
+- Sound is on by default; toggle it with **Sound** or M.
+- Video recording is not included.
 
