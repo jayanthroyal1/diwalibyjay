@@ -138,5 +138,6 @@ export class Anar implements FireworkEffect {
 
   public stop(): void {
     this.active = false;
+    this.onSound?.('ANAR_STOP');
   }
 }

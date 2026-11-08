@@ -95,5 +95,6 @@ export class Sparkler implements FireworkEffect {
 
   public stop(): void {
     this.active = false;
+    this.onSound?.('SPARKLER_STOP');
   }
 }

@@ -1,14 +1,38 @@
 /* Video is an inference-only source. The stage canvas composites it once with the fireworks. */
-#camera,
-#app.camera-on #camera {
+#camera {
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;
   inset: auto auto 0 0 !important;
   opacity: 0 !important;
+  z-index: -1 !important;
   pointer-events: none !important;
   transform: scaleX(-1);
 }
+
+#app.camera-on #camera {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: .78 !important;
+  z-index: 0 !important;
+  object-fit: cover;
+  object-position: center;
+  filter: brightness(.84) contrast(1.04) saturate(.9);
+  transition: opacity .3s ease;
+}
+
+#stage { z-index: 2 !important; background: transparent; }
+.live-status { z-index: 4; }
+.gesture-hint { z-index: 4; }
+.topbar { z-index: 5; }
+.vignette {
+  z-index: 1 !important;
+  background: linear-gradient(110deg, rgba(19,12,27,.32), rgba(22,13,29,.12) 56%, rgba(20,12,27,.14)), linear-gradient(0deg, rgba(18,11,25,.38), transparent 48%);
+  backdrop-filter: blur(.5px) saturate(1.08);
+}
+#app.camera-on::after { z-index: 1; backdrop-filter: none; }
 
 /* Keep gesture instructions clear of the greeting on narrow phone screens. */
 @media (max-width: 700px) {

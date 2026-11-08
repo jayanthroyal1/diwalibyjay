@@ -119,6 +119,19 @@ export class ParticlePool {
   }
 
   public addFlash(x: number, y: number, radius: number, color: ParticleColor, intensity: number = 0.5): void {
+    const limit = radius * 0.32;
+    for (const flash of this.flashes) {
+      const dx = flash.x - x;
+      const dy = flash.y - y;
+      if (dx * dx + dy * dy < limit * limit) {
+        flash.x = x;
+        flash.y = y;
+        flash.radius = Math.max(flash.radius, radius);
+        flash.color = color;
+        flash.alpha = Math.min(1, Math.max(flash.alpha, intensity));
+        return;
+      }
+    }
     this.flashes.push({
       x,
       y,
@@ -224,12 +237,6 @@ export class ParticlePool {
         ctx.lineTo(p.x, p.y);
         ctx.stroke();
       }
-
-      // Outer Bloom Halo
-      ctx.fillStyle = colorStr;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * 1.9 * p.alpha, 0, Math.PI * 2);
-      ctx.fill();
 
       // Blinding White-Hot Core Spark
       ctx.fillStyle = coreColorStr;
